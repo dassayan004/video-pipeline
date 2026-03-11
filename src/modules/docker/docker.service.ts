@@ -91,7 +91,9 @@ export class DockerService {
       container = await this.docker.createContainer({
         name: containerName,
         Image: this.ffmpegImage,
-        Cmd: ['sh', '-c', shellCmd],
+        // Override ffmpeg image entrypoint so we can run a shell script
+        Entrypoint: ['sh', '-c'],
+        Cmd: [shellCmd],
         Env: [`JOB_ID=${params.jobId}`],
         HostConfig: {
           AutoRemove: false,

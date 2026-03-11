@@ -1,0 +1,80 @@
+version: '3.9'
+
+services:
+
+  # ── NestJS API ─────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: video-pipeline-api
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Supabase
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_TEMP_BUCKET: ${SUPABASE_TEMP_BUCKET:-temp-videos}
+      SUPABASE_PROD_BUCKET: ${SUPABASE_PROD_BUCKET:-prod-videos}
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # Database
+      DATABASE_URL: ${DATABASE_URL}
+      # Docker (mounts host socket so API can spawn sibling containers)
+      DOCKER_SOCKET: /var/run/docker.sock
+      FFMPEG_IMAGE: jrottenberg/ffmpeg:4.4-alpine
+      # Limits
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-500}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # sibling container access
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - pipeline-net
+
+  # ── Redis (BullMQ backend) ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: video-pipeline-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pipeline-net
+
+  # ── Redis Commander (optional dev UI) ─────────────────────────────────────
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: video-pipeline-redis-ui
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - '8081:8081'
+    depends_on:
+      - redis
+    profiles:
+      - dev
+    networks:
+      - pipeline-net
+
+volumes:
+  redis-data:
+
+networks:
+  pipeline-net:
+    driver: bridge

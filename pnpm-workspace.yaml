@@ -1,0 +1,9 @@
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - cpu-features
+  - msgpackr-extract
+  - prisma
+  - protobufjs
+  - ssh2

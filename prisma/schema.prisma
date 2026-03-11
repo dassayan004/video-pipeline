@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Video {
+  id           String      @id @default(uuid())
+  userId       String
+  originalName String
+  mimeType     String
+  sizeBytes    BigInt
+
+  // Storage paths
+  tempPath     String?     // temp-videos/{jobId}/raw.mp4
+  status       VideoStatus @default(PENDING)
+
+  // Transcoded outputs (populated after processing)
+  outputs      VideoOutput[]
+
+  jobId        String?     @unique
+  errorMessage String?
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model VideoOutput {
+  id         String   @id @default(uuid())
+  videoId    String
+  video      Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  resolution String   // "4k" | "1080p" | "720p" | "480p"
+  width      Int
+  height     Int
+  bitrate    String
+  storagePath String  // prod-videos/{jobId}/{resolution}.mp4
+  publicUrl  String
+  sizeBytes  BigInt?
+  createdAt  DateTime @default(now())
+
+  @@index([videoId])
+}
+
+enum VideoStatus {
+  PENDING
+  UPLOADING
+  QUEUED
+  VALIDATING
+  PROCESSING
+  UPLOADING_OUTPUTS
+  READY
+  FAILED
+}
